@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<!--
+	Evil Lair Contruction Set - an HTML5 game written for the Ludum Dare 25
+	Copyright (C) 2012 Jonas "sanojian" Olmstead
+	
+-->
+<html>
+	<head>
+		<script type="text/javascript" src="./includes/crafty.js"></script>
+		<script type="text/javascript" src="./diamondiso.js"></script>
+		<script type="text/javascript" src="./includes/raphael2.js"></script>
+		<script type="text/javascript" src="./includes/jQuery.js"></script>
+		<link href='//fonts.googleapis.com/css?family=Gorditas' rel='stylesheet' type='text/css'>
+		<style>
+			body, html { margin:0; padding: 0; overflow:hidden; font-family:Arial; font-size:20px }
+			#cr-stage { border:2px solid black; margin:5px auto; color:white; background: #62351C; }
+		</style>
+		
+		<script language="javascript">
+
+var g_game = {
+					VW: 1200,
+					VH: 640,
+					TW: 64,
+					TH: 32,
+					MW: 100,
+					MH: 100,
+					FONT: '12pt "Gorditas", cursive', //'12pt "Arial',
+					RENDER: 'Canvas',
+					map: [],
+					buttonW: 64,
+					mode: 'destroy'
+}		
+
+var g_hud = {
+				
+};
+
+$(document).ready(function() {
+	Crafty.init(g_game.VW, g_game.VH);
+	doCraftyInitialization();
+	
+	var pos = jQuery("#cr-stage").aPosition();
+
+	// HUD
+	var pos = jQuery("#cr-stage").aPosition();
+	jQuery("#raphHolder").css( { position: "absolute", top: pos.top, left: pos.left, 
+		height: jQuery("#cr-stage").height(), width: 160, "z-index": 1000 });
+	g_hud.raphPaper = Raphael("raphHolder");
+	g_hud.raphPaper.rect(0, 0, g_hud.raphPaper.width, g_hud.raphPaper.height).attr({ fill: '#7E7068', 'stroke-width': 4 });
+	var y = 0;
+	g_hud.buttonSelector = g_hud.raphPaper.rect(g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ stroke: '#ffffff', 'stroke-width': 4 });
+	g_hud.buttonDemo = g_hud.raphPaper.image('./images/btnPick.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
+		.click(function() {
+			g_game.mode = 'destroy';
+			Crafty('wallDirt').bind('MouseOver', mouseOverBlock);
+			g_game.buildSelector.attr({ x: -1000, y: -1000 });
+			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
+		});
+	y++;
+	g_hud.buttonFloorStone = g_hud.raphPaper.image('./images/btnStone.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
+		.click(function() {
+			g_game.mode = 'floor';
+			g_game.blockSelector.removingDirt = false;
+			Crafty('wallDirt').unbind('MouseOver');
+			g_game.buildType = 'Stone';
+			g_game.blockSelector.attr({ x: -1000, y: -1000 });
+			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
+		});
+	y++;
+	g_hud.buttonFloorTreasure = g_hud.raphPaper.image('./images/btnTreasure.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
+		.click(function() {
+			g_game.mode = 'floor';
+			g_game.blockSelector.removingDirt = false;
+			Crafty('wallDirt').unbind('MouseOver');
+			g_game.buildType = 'Treasure';
+			g_game.blockSelector.attr({ x: -1000, y: -1000 });
+			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
+		});
+	y++;
+	g_hud.buttonFloorHatchery = g_hud.raphPaper.image('./images/btnHatchery.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
+		.click(function() {
+			g_game.mode = 'floor';
+			Crafty('wallDirt').unbind('MouseOver');
+			g_game.blockSelector.removingDirt = false;
+			g_game.buildType = 'Hatchery';
+			g_game.blockSelector.attr({ x: -1000, y: -1000 });
+			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
+		});
+	y++;
+	
+});
+
+var startCavern = function() {
+	var tiles = [ [50, 98], [50, 97], [50, 96] ];
+	var c = 0;
+	var intClearing = setInterval(function() {
+		if (c >= tiles.length) {
+			clearInterval(intClearing);
+			return;
+		}
+		removeDirt({ selected: g_game.map[tiles[c][1]][tiles[c][0]].block });
+		c++;
+	}, 500);
+	
+};
+
+var screenToIso = function(screenX, screenY) {
+	var isoX = screenY / g_game.TH + screenX / (2*g_game.TW)
+	var isoY = screenY / g_game.TH - screenX / (2*g_game.TW)
+	return { x: isoX, y: isoY };
+};
+
+var mouseOverBlock = function() {
+	if (g_game.mode == 'destroy' && g_game.blockSelector.selected != this) {
+		g_game.blockSelector.attr({ x: this.x, y: this.y, z: this.z+1 });
+		g_game.blockSelector.selected = this;
+	}
+};
+
+var placeBlock = function(i, j) {
+	if (i > g_game.MW - 1 || i < 0 || j < 0 || j > g_game.MH - 1) {
+		return;		// out of bounds
+	}
+	if (g_game.map[j] && g_game.map[j][i]) {
+		return;		// something already there
+	}
+	var tile = Crafty.e('2D, ' + g_game.RENDER + ', wallDirt, solid, Collision, Mouse')
+		.collision(new Crafty.polygon([0,3*g_game.TW/4],[g_game.TW/2,g_game.TW/2],[g_game.TW,3*g_game.TW/4],[g_game.TW/2,g_game.TW]))
+		.areaMap([g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW/2,g_game.TW/2],[0,g_game.TW/4])
+		.bind("MouseOver", mouseOverBlock);
+	tile.iso = { x: i, y: j };
+	g_game.ISO.place(tile, i, j, 1);
+	if (!g_game.map[j]) {
+		g_game.map[j] = [];
+	}
+	g_game.map[j][i] = { block: tile };
+
+};
+
+var removeDirt = function(selector) {
+	if (g_game.map[selector.selected.iso.y][selector.selected.iso.x].block == null) {
+		return;
+	}
+	var tile = Crafty.e('2D, ' + g_game.RENDER + ', floorDirt');
+	
+	tile.iso = { x: selector.selected.iso.x, y: selector.selected.iso.y };
+	g_game.map[selector.selected.iso.y][selector.selected.iso.x].block = null;
+	g_game.ISO.place(tile, selector.selected.iso.x, selector.selected.iso.y, 0);
+	Crafty.e('2D, ' + g_game.RENDER + ', Mouse')
+		.attr({ x: tile.x, y: tile.y-g_game.TW/2, z: tile.z })
+		.areaMap([0, g_game.TW/4], [g_game.TW/2, 0], [g_game.TW, g_game.TW/4], [g_game.TW/2, g_game.TW/2])
+		.bind("MouseOver", function(e) {
+			if (g_game.mode == 'floor' && g_game.buildSelector.selected != tile) {
+				g_game.buildSelector.attr({ x: this.x, y: this.y, z: tile.z+1 });
+				g_game.buildSelector.selected = tile;
+			}
+		});			
+
+	if (g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallE) {
+		g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallE.destroy();
+	}
+	if (g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallW) {
+		g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallW.destroy();
+	}
+	selector.selected.destroy();
+	placeBlock(tile.iso.x, tile.iso.y-1);
+	placeBlock(tile.iso.x, tile.iso.y+1);
+	placeBlock(tile.iso.x-1, tile.iso.y);
+	placeBlock(tile.iso.x+1, tile.iso.y);
+	
+	var numPieces = 1 + Math.floor(4*Math.random());
+	for (var i=0;i<numPieces;i++) {
+		Crafty.e('2D, ' + g_game.RENDER + ', dirtPiece')
+			.attr({ x: tile.x + g_game.TW*Math.random(), y: tile.y + Math.random()*g_game.TW/2, z: tile.z + 1 })
+			.bind('EnterFrame', function() {
+				this.frameCount = this.frameCount ? this.frameCount + 1 : 1;
+				this.dx = this.dx ? this.dx : 2 - Math.random() * 4;
+				this.dy = this.dy ? this.dy : -4 - Math.random() * 4;
+				this.dy += 0.3;
+				this.duration = this.duration ? this.duration : 15 + 30 * Math.random();
+				this.attr({ x: this.x + this.dx, y: this.y + this.dy });
+				if (this.frameCount > this.duration) {
+					this.destroy();
+				}
+			});
+	}
+};
+		
+function doCraftyInitialization() {
+	
+	Crafty.scene("main", function () {
+		
+		//Crafty.background('url(./images/background.png)');
+		//var iso = Crafty.isometric.size(g_game.TW, g_game.TH);
+		g_game.ISO = Crafty.diamondIso.init(g_game.TW, g_game.TH, g_game.MW, g_game.MH);
+		g_game.ISO.centerAt(g_game.MW/2 - 5, g_game.MH - 12);
+		var tile = null;
+		
+
+		
+		var buildFloor = function(selector) {
+			if (g_game.map[selector.selected.iso.y][selector.selected.iso.x].floor) {
+				return;		// already floor here
+			}
+			selector.selected.removeComponent('floorDirt').addComponent('floor' + g_game.buildType);
+			//var floor = Crafty.e('2D, ' + g_game.RENDER + ', floor' + g_game.buildType);
+			//g_game.ISO.place(floor, selector.selected.iso.x, selector.selected.iso.y, 0);
+			g_game.map[selector.selected.iso.y][selector.selected.iso.x].floor = selector.selected;
+			if (g_game.map[selector.selected.iso.y][selector.selected.iso.x-1] && g_game.map[selector.selected.iso.y][selector.selected.iso.x-1].block) {
+				// place east wall
+				var wall = Crafty.e('2D, ' + g_game.RENDER + ', wall' + g_game.buildType + 'E');
+				g_game.map[selector.selected.iso.y][selector.selected.iso.x-1].wallE = wall;
+				g_game.ISO.place(wall, selector.selected.iso.x-1, selector.selected.iso.y, 1);
+			}
+			if (g_game.map[selector.selected.iso.y-1] && g_game.map[selector.selected.iso.y-1][selector.selected.iso.x] && g_game.map[selector.selected.iso.y-1][selector.selected.iso.x].block) {
+				// place west wall
+				var wall = Crafty.e('2D, ' + g_game.RENDER + ', wall' + g_game.buildType + 'W');
+				g_game.map[selector.selected.iso.y-1][selector.selected.iso.x].wallW = wall;
+				g_game.ISO.place(wall, selector.selected.iso.x, selector.selected.iso.y-1, 1);
+			}
+			//selector.selected.destroy();
+		
+		};
+		
+		g_game.blockSelector = Crafty.e('2D, ' + g_game.RENDER + ', blockSelector, Mouse')
+			.areaMap([g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW, 3*g_game.TW/4],[g_game.TW/2, g_game.TW],[0,3*g_game.TW/4],[0,g_game.TW/4])
+			.bind("MouseDown", function(e) {
+				removeDirt(this);
+				this.removingDirt = true;
+			}).bind("MouseUp", function(e) {
+				this.removingDirt = false;
+			}).bind("MouseMove", function(e) {
+				if (this.removingDirt) { 
+					removeDirt(this);
+				}
+			});
+		g_game.buildSelector = Crafty.e('2D, ' + g_game.RENDER + ', buildSelector, Mouse')
+			.areaMap([g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW, 3*g_game.TW/4],[g_game.TW/2, g_game.TW],[0,3*g_game.TW/4],[0,g_game.TW/4])
+			.bind("MouseDown", function(e) {
+				buildFloor(g_game.buildSelector);
+				g_game.buildSelector.buildingFloor = true;
+			}).bind("MouseUp", function(e) {
+				g_game.buildSelector.buildingFloor = false;
+			}).bind("MouseMove", function(e) {
+				if (this.buildingFloor) { 
+					buildFloor(g_game.buildSelector);
+				}
+			});
+		
+		var j = 99;
+		g_game.map[j] = [];
+		for (var i=40;i<60;i++) {
+			var px = g_game.ISO.pos2px(i, j);
+			tile = Crafty.e('2D, ' + g_game.RENDER + ', floorGrass');
+			tile.iso = { x: i, y: j };
+			g_game.ISO.place(tile, i, j, 0);
+			g_game.map[j][i] = { floor: tile };
+		
+		}
+		
+		
+		
+		var j = 98;
+		g_game.map[j] = [];
+		for (var i=40;i<60;i++) {
+			placeBlock(i, j);
+		}
+		
+		tile = Crafty.e('2D, ' + g_game.RENDER + ', Grid, Multiway, man, Collision')
+								.collision(new Crafty.polygon([4,18],[24,18],[22,24],[4,24]))
+								.multiway(2, {W: -90, S: 90, D: 0, A: 180})
+								.bind('Moved', function(from) {
+									var solids = this.hit('solid');
+									if (solids) {
+										this.attr( { x: from.x, y: from.y });
+									}
+									//var isoCoords = iso.px2pos(this.x + this.w/2, this.y + this.h);
+									//this.attr({ z: 5 + isoCoords.y * -10 });
+									this.attr({ z: this.y + 64});
+								});
+		g_game.ISO.place(tile, 3, 6, 1);
+			
+		startCavern();
+
+		//Crafty.e('2D, ' + g_game.RENDER + ', shader').attr({ z: 10000 });
+	});
+
+	Crafty.scene("loading", function () {
+		Crafty.e('2D, ' + g_game.RENDER + ', Text').attr({ w: 100, h: 20, x: g_game.VW/2 - 55, y: g_game.VW/2-60 })
+			.text("Loading")
+			//.css({ "text-align": "center", "font-family": g_game.FONT, "font-size": "44px" });
+			
+		Crafty.load([	'./images/grass.png', './images/dirt.png', "./images/iso5.png"
+					], 
+					function() {
+						Crafty.sprite(1, "./images/grass.png", {
+							floorGrass: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
+							wallGrass: [g_game.TW, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(1, "./images/dirtTrans.png", {
+							floorDirt: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
+							wallDirt: [g_game.TW, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(32, "./images/kobold.png", {
+							man: [0, 0]
+						});
+						Crafty.sprite(1, "./images/blockSelector.png", {
+							tileSelector: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
+							blockSelector: [g_game.TW, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(1, "./images/buildSelector.png", {
+							buildSelector: [g_game.TW, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(1, "./images/stone.png", {
+							floorStone: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
+							wallStoneW: [g_game.TW, 0, g_game.TW, g_game.TW],
+							wallStoneE: [g_game.TW*2, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(1, "./images/roomTreasure.png", {
+							floorTreasure: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
+							wallTreasureW: [g_game.TW, 0, g_game.TW, g_game.TW],
+							wallTreasureE: [g_game.TW*2, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(1, "./images/roomHatchery.png", {
+							floorHatchery: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
+							wallHatcheryW: [g_game.TW, 0, g_game.TW, g_game.TW],
+							wallHatcheryE: [g_game.TW*2, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(8, "./images/dirtpiece.png", {
+							dirtPiece: [0, 0]
+						});
+						Crafty.scene("main");
+					}
+		);
+	
+	});
+	Crafty.scene("loading");
+}
+
+// fix for Webkit browsers too fast
+jQuery.fn.aPosition = function() {
+    thisLeft = this.offset().left;
+    thisTop = this.offset().top;
+    thisParent = this.parent();
+
+    parentLeft = thisParent.offset().left;
+    parentTop = thisParent.offset().top;
+
+    return {
+        left: thisLeft-parentLeft,
+        top: thisTop-parentTop
+    };
+};	
+
+</script>
+
+	</head>
+	<body>
+		<div id="raphHolder"></div>
+	</body>
+</html>
