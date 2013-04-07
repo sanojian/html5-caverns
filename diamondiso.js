@@ -121,6 +121,34 @@ Crafty.extend({
             }
         },
         px2pos:function(left,top){
+            var x = (left ) * this._tile.height/2;
+            var y = (top + 3*this._tile.height/4) * this._tile.width/2;
+			var TILE_AREA = this._tile.height * this._tile.height;
+			var offset = (this._origin.x + this._tile.height) * this._tile.height/2;
+            
+			return {
+				x: (y + x - offset) / TILE_AREA,
+				y: (y - x + offset) / TILE_AREA
+			}
+        },
+        px2pos4:function(left,top){
+            var x = (left ) * this._tile.height;
+            var y = (top ) * this._tile.width;
+			var TILE_AREA = this._tile.height * this._tile.width;
+            return {
+				x: (y - x + this._origin.x) / TILE_AREA,
+				y: (y + x) / TILE_AREA
+			}
+        },
+        px2pos3:function(left,top){
+            var x = (left - this._origin.x);
+			
+            return {
+				x: (x/this._tile.height + 2*top/this._tile.height)/2,
+				y: (2*top/this._tile.height - x/this._tile.height)/2
+			}
+        },
+        px2pos2:function(left,top){
             var x = (left - this._origin.x)/this._tile.r;
             return {
                 x:((top+x) / this._tile.height),

@@ -15,7 +15,7 @@
 		<link href='//fonts.googleapis.com/css?family=Gorditas' rel='stylesheet' type='text/css'>
 		<style>
 			body, html { margin:0; padding: 0; overflow:hidden; font-family:Arial; font-size:20px }
-			#cr-stage { border:2px solid black; margin:5px auto; color:white; background: #2B1C1D; background2: #62351C; }
+			#cr-stage { border:2px solid black; margin:5px auto; color:white; background: #62351C; }
 		</style>
 		
 		<script language="javascript">
@@ -72,16 +72,20 @@ $(document).ready(function() {
 	g_hud.buttonFloorStone = g_hud.raphPaper.image('./images/btnStone.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'floor';
+			g_game.blockSelector.removingDirt = false;
 			Crafty('wallDirt').unbind('MouseDown');
 			g_game.buildType = 'Stone';
+			g_game.blockSelector.attr({ x: -1000, y: -1000 });
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
 	y++;
 	g_hud.buttonFloorTreasure = g_hud.raphPaper.image('./images/btnTreasure.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'floor';
+			g_game.blockSelector.removingDirt = false;
 			Crafty('wallDirt').unbind('MouseDown');
 			g_game.buildType = 'Treasure';
+			g_game.blockSelector.attr({ x: -1000, y: -1000 });
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
 	y++;
@@ -89,15 +93,19 @@ $(document).ready(function() {
 		.click(function() {
 			g_game.mode = 'floor';
 			Crafty('wallDirt').unbind('MouseDown');
+			g_game.blockSelector.removingDirt = false;
 			g_game.buildType = 'Hatchery';
+			g_game.blockSelector.attr({ x: -1000, y: -1000 });
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
 	y++;
 	g_hud.buttonFloorStone = g_hud.raphPaper.image('./images/btnStone.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'floor';
+			g_game.blockSelector.removingDirt = false;
 			Crafty('wallDirt').unbind('MouseDown');
 			g_game.buildType = 'Kitchen';
+			g_game.blockSelector.attr({ x: -1000, y: -1000 });
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
 	y++;
@@ -112,11 +120,11 @@ var startCavern = function() {
 			clearInterval(intClearing);
 			return;
 		}
-		removeDirt( g_game.map[tiles[c][1]][tiles[c][0]].block );
+		removeDirt({ selected: g_game.map[tiles[c][1]][tiles[c][0]].block });
 		c++;
 	}, 500);
 	
-	addKobold(45, 99);
+	addKobold(50, 99);
 	
 };
 
@@ -126,19 +134,21 @@ var screenToIso = function(screenX, screenY) {
 	return { x: isoX, y: isoY };
 };
 
+var mouseOverBlock = function() {
+	if (g_game.mode == 'destroy' && g_game.blockSelector.selected != this) {
+		g_game.blockSelector.attr({ x: this.x, y: this.y, z: this.z+1 });
+		g_game.blockSelector.selected = this;
+	}
+};
+
 var mouseDownBlock = function() {
-	var selector = Crafty.e('2D, ' + g_game.RENDER + ', blockSelector, Mouse, Collision')
+
+	var selector = Crafty.e('2D, ' + g_game.RENDER + ', blockSelector, Mouse')
 						.attr({ x: this.x, y: this.y, z: this.z+1 })
-						.areaMap([0,g_game.TW/4],[g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW,3*g_game.TW/4],[g_game.TW/2,g_game.TW],[0,3*g_game.TW/4])
-						.collision(new Crafty.polygon([0,3*g_game.TW/4],[g_game.TW/2,g_game.TW/2],[g_game.TW,3*g_game.TW/4],[g_game.TW/2,g_game.TW]))
 						.bind('MouseDown', function() {
-							g_game.graph.input[this.game.selected.iso.x][this.game.selected.iso.y] = GraphNodeType.WALL;
-							g_game.graph.nodes[this.game.selected.iso.x][this.game.selected.iso.y].type = GraphNodeType.WALL;
 							this.destroy();
 						});
 						
-	g_game.graph.input[this.iso.x][this.iso.y] = GraphNodeType.OPEN;
-	g_game.graph.nodes[this.iso.x][this.iso.y].type = GraphNodeType.OPEN;
 	selector.game = { selected: this };
 };
 
@@ -168,19 +178,19 @@ var placeBlock = function(i, j) {
 
 };
 
-var removeDirt = function(block) {
-	if (g_game.map[block.iso.y][block.iso.x].block == null) {
+var removeDirt = function(selector) {
+	if (g_game.map[selector.selected.iso.y][selector.selected.iso.x].block == null) {
 		return;
 	}
 	
-	g_game.graph.input[block.iso.x][block.iso.y] = GraphNodeType.OPEN;
-	g_game.graph.nodes[block.iso.x][block.iso.y].type = GraphNodeType.OPEN;
+	g_game.graph.input[selector.selected.iso.x][selector.selected.iso.y] = GraphNodeType.OPEN;
+	g_game.graph.nodes[selector.selected.iso.x][selector.selected.iso.y].type = GraphNodeType.OPEN;
 	
 	var tile = Crafty.e('2D, ' + g_game.RENDER + ', floorDirt');
 	
-	tile.iso = { x: block.iso.x, y: block.iso.y };
-	g_game.map[block.iso.y][block.iso.x].block = null;
-	g_game.ISO.place(tile, block.iso.x, block.iso.y, 0);
+	tile.iso = { x: selector.selected.iso.x, y: selector.selected.iso.y };
+	g_game.map[selector.selected.iso.y][selector.selected.iso.x].block = null;
+	g_game.ISO.place(tile, selector.selected.iso.x, selector.selected.iso.y, 0);
 	Crafty.e('2D, ' + g_game.RENDER + ', Mouse')
 		.attr({ x: tile.x, y: tile.y-g_game.TW/2, z: tile.z })
 		.areaMap([0, g_game.TW/4], [g_game.TW/2, 0], [g_game.TW, g_game.TW/4], [g_game.TW/2, g_game.TW/2])
@@ -191,13 +201,13 @@ var removeDirt = function(block) {
 			}
 		});			
 
-	if (g_game.map[block.iso.y][block.iso.x].wallE) {
-		g_game.map[block.iso.y][block.iso.x].wallE.destroy();
+	if (g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallE) {
+		g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallE.destroy();
 	}
-	if (g_game.map[block.iso.y][block.iso.x].wallW) {
-		g_game.map[block.iso.y][block.iso.x].wallW.destroy();
+	if (g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallW) {
+		g_game.map[selector.selected.iso.y][selector.selected.iso.x].wallW.destroy();
 	}
-	block.destroy();
+	selector.selected.destroy();
 	for (var j=-2;j<3;j++) {
 		for (var i=-2;i<3;i++) {
 			placeBlock(tile.iso.x+i, tile.iso.y-+j);
@@ -227,7 +237,6 @@ function addKobold(x, y, tile) {
 	var kobold = Crafty.e('Kobold').Kobold();
 		
 	g_game.ISO.place(kobold, x, y, 1);
-	kobold.attr({ x: kobold.x + g_game.TW/2 - kobold.w/2, y: kobold.y - kobold.h/4 });
 	
 	kobold.game = { tile: tile };
 	
@@ -278,35 +287,13 @@ function doCraftyInitialization() {
 
 			Kobold: function() {
 				this.requires('2D, ' + g_game.RENDER + ', Grid, SpriteAnimation, kobold, Collision')
-					.collision(new Crafty.polygon([12,28],[20,28],[28,32],[12,32]))
+					.collision(new Crafty.polygon([4,18],[24,18],[22,24],[4,24]))
 					.animate("walk_SE", 0, 0, 3)
 					.animate("walk_SW", 0, 1, 3)
 					.animate("walk_NE", 0, 2, 3)
 					.animate("walk_NW", 0, 3, 3)
 					.bind("EnterFrame", function () {
 						this.frameCount++;
-						
-						if (this.frameCount % 60 == 0) {
-							this.findWork();
-							//if (this.path.length == 0) {
-							//	this.direction = { x: Math.random() > 0.5 ? 1 : -1, y: Math.random() > 0.5 ? 0.5 : -0.5 };
-							//}
-						}
-						var oldDir = this.direction;
-						if (this.path && this.path.length) {
-							var pos = g_game.ISO.px2pos(this.x + this.w/2, this.y + 3*this.h/4); 
-							var dirX = pos.x - this.path[0].x > 0 ? -1 : 1;
-							var dirY = pos.y - this.path[0].y > 0 ? -0.5 : 0.5;
-
-							this.direction = { x: dirX, y: dirY };
-						}
-						else {
-							this.direction = { x: 0, y: 0 };
-						}
-						if (oldDir.x != this.direction.x  || oldDir.y != this.direction.y) {
-							this.trigger('NewDirection');
-						}
-						
 						var from = {x: this.x, y: this.y};
 						this.attr({ x: this.x + this.direction.x, y: this.y + this.direction.y });
 						this.trigger('Moved', from);
@@ -333,24 +320,11 @@ function doCraftyInitialization() {
 						}
 					})
 					.bind('Moved', function(from) {
-						var solids = this.hit('blockSelector');
-						if (solids) {
-							removeDirt(solids[0].obj.game.selected);
-							solids[0].obj.destroy();
-							
-						}
-						solids = this.hit('solid');
+						var solids = this.hit('solid');
 						if (solids) {
 							this.attr( { x: from.x, y: from.y });
-							this.direction = { x: 0, y: 0 };
-							//this.trigger('NewDirection');
-						}
-						if (this.path && this.path.length) {
-							var pos = g_game.ISO.px2pos(this.x + this.w/2, this.y + 3*this.h/4); 
-							if (Math.abs(this.path[0].x - pos.x) < 0.25 && Math.abs(this.path[0].y - pos.y) < 0.25) {
-								console.log('pop ' + this.path[0].x + ', ' + this.path[0].y);
-								this.path.shift();
-							}
+							this.direction = { x: Math.random() > 0.5 ? 1: -1, y: Math.random() > 0.5 ? 0.5: -0.5 };
+							this.trigger('NewDirection');
 						}
 						//var isoCoords = iso.px2pos(this.x + this.w/2, this.y + this.h);
 						//this.attr({ z: 5 + isoCoords.y * -10 });
@@ -360,22 +334,6 @@ function doCraftyInitialization() {
 				this.trigger('NewDirection', this.direction);
 				
 				return this;
-			},
-			findWork: function() {
-				var markedBlocks = Crafty('blockSelector');
-				if (markedBlocks.length !== 0) {
-					var block = Crafty(markedBlocks[Math.floor(Math.random() * markedBlocks.length)]);
-					
-					var pos = g_game.ISO.px2pos(this.x + this.w/2, this.y + this.h);
-					console.log(pos);
-					var isoX = Math.floor(pos.x);
-					var isoY = Math.min(99,Math.floor(pos.y));
-					this.path = astar.search(g_game.graph.nodes, g_game.graph.nodes[isoX][isoY], g_game.graph.nodes[block.game.selected.iso.x][block.game.selected.iso.y], false);
-				}
-				else {
-					this.path = [];
-				}
-				
 			}
 		});
 		
@@ -490,6 +448,19 @@ function doCraftyInitialization() {
 		
 		};
 		
+		g_game.blockSelector = Crafty.e('2D, ' + g_game.RENDER + ', blockSelector, Mouse')
+			.areaMap([g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW, 3*g_game.TW/4],[g_game.TW/2, g_game.TW],[0,3*g_game.TW/4],[0,g_game.TW/4])
+			.bind("MouseDown", function(e) {
+				//removeDirt(this);
+				var path = astar.search(g_game.graph.nodes, g_game.graph.nodes[50][99], g_game.graph.nodes[this.selected.iso.x][this.selected.iso.y] , false)
+				this.removingDirt = true;
+			}).bind("MouseUp", function(e) {
+				this.removingDirt = false;
+			}).bind("MouseMove", function(e) {
+				if (this.removingDirt) { 
+					removeDirt(this);
+				}
+			});
 		g_game.buildSelector = Crafty.e('2D, ' + g_game.RENDER + ', buildSelector, Mouse')
 			.areaMap([g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW, 3*g_game.TW/4],[g_game.TW/2, g_game.TW],[0,3*g_game.TW/4],[0,g_game.TW/4])
 			.bind("MouseDown", function(e) {
