@@ -12,7 +12,7 @@
 		<script type="text/javascript" src="./includes/jQuery.js"></script>
 		<script type="text/javascript" src="./includes/graph.js"></script>
 		<script type="text/javascript" src="./includes/astar.js"></script>
-		<link href='//fonts.googleapis.com/css?family=Gorditas' rel='stylesheet' type='text/css'>
+		<!--link href='//fonts.googleapis.com/css?family=Gorditas' rel='stylesheet' type='text/css'-->
 		<style>
 			body, html { margin:0; padding: 0; overflow:hidden; font-family:Arial; font-size:20px }
 			#cr-stage { border:2px solid black; margin:5px auto; color:white; background: #2B1C1D; background2: #62351C; }
@@ -42,7 +42,8 @@ var g_hud = {
 var g_matches = {
 	Hatchery: { x: 2, y: 2, resultFloor: ['FirePit', 0, 0, 0] },
 	Stone: { x: 3, y: 2, resultFloor: [0, 'Table', 0, 0, 0, 0] },
-	Kitchen: { x: 2, y: 2, resultFloor: [0, 'Table', 0, 0, 0, 0] }
+	Kitchen: { x: 2, y: 2, resultFloor: [0, 'Table', 0, 0, 0, 0] },
+	Treasure: { x: 3, y: 3, resultFloor: [0, 0, 0, 0, 'Chest', 0, 0, 0, 0] }
 
 
 }
@@ -50,6 +51,8 @@ var g_matches = {
 $(document).ready(function() {
 	Crafty.init(g_game.VW, g_game.VH);
 	doCraftyInitialization();
+	
+	$(document).mouseup(function() { g_game.selectingBlocks = false; });
 	
 	var pos = jQuery("#cr-stage").aPosition();
 
@@ -64,7 +67,7 @@ $(document).ready(function() {
 	g_hud.buttonDemo = g_hud.raphPaper.image('./images/btnPick.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'destroy';
-			Crafty('wallDirt').bind('MouseDown', mouseDownBlock);
+			Crafty('wallDirt').bind('MouseDown', mouseDownBlock).bind('MouseOver', mouseOverBlock);
 			g_game.buildSelector.attr({ x: -1000, y: -1000 });
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
@@ -72,7 +75,7 @@ $(document).ready(function() {
 	g_hud.buttonFloorStone = g_hud.raphPaper.image('./images/btnStone.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'floor';
-			Crafty('wallDirt').unbind('MouseDown');
+			Crafty('wallDirt').unbind('MouseDown').unbind('MouseOver');
 			g_game.buildType = 'Stone';
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
@@ -80,7 +83,7 @@ $(document).ready(function() {
 	g_hud.buttonFloorTreasure = g_hud.raphPaper.image('./images/btnTreasure.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'floor';
-			Crafty('wallDirt').unbind('MouseDown');
+			Crafty('wallDirt').unbind('MouseDown').unbind('MouseOver');
 			g_game.buildType = 'Treasure';
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
@@ -88,19 +91,19 @@ $(document).ready(function() {
 	g_hud.buttonFloorHatchery = g_hud.raphPaper.image('./images/btnHatchery.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'floor';
-			Crafty('wallDirt').unbind('MouseDown');
+			Crafty('wallDirt').unbind('MouseDown').unbind('MouseOver');
 			g_game.buildType = 'Hatchery';
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
 	y++;
-	g_hud.buttonFloorStone = g_hud.raphPaper.image('./images/btnStone.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
+	/*g_hud.buttonFloorStone = g_hud.raphPaper.image('./images/btnStone.png', g_hud.raphPaper.width/2 - g_game.buttonW/2, y*3*g_game.buttonW/2 + g_game.buttonW/2, g_game.buttonW, g_game.buttonW).attr({ fill: '#ffffff', 'stroke-width': 4 })
 		.click(function() {
 			g_game.mode = 'floor';
-			Crafty('wallDirt').unbind('MouseDown');
+			Crafty('wallDirt').unbind('MouseDown').unbind('MouseOver');
 			g_game.buildType = 'Kitchen';
 			g_hud.buttonSelector.attr({ x: this.attrs.x, y: this.attrs.y }).toFront();
 		});
-	y++;
+	y++;*/
 	
 });
 
@@ -126,9 +129,20 @@ var screenToIso = function(screenX, screenY) {
 	return { x: isoX, y: isoY };
 };
 
+var mouseOverBlock = function(evt) {
+	if (g_game.selectingBlocks) {
+		selectBlock(this);
+	}
+}
+
 var mouseDownBlock = function() {
+	selectBlock(this);
+	g_game.selectingBlocks = true;
+};
+
+var selectBlock = function(block) {
 	var selector = Crafty.e('2D, ' + g_game.RENDER + ', blockSelector, Mouse, Collision')
-						.attr({ x: this.x, y: this.y, z: this.z+1 })
+						.attr({ x: block.x, y: block.y, z: block.z+1 })
 						.areaMap([0,g_game.TW/4],[g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW,3*g_game.TW/4],[g_game.TW/2,g_game.TW],[0,3*g_game.TW/4])
 						.collision(new Crafty.polygon([0,3*g_game.TW/4],[g_game.TW/2,g_game.TW/2],[g_game.TW,3*g_game.TW/4],[g_game.TW/2,g_game.TW]))
 						.bind('MouseDown', function() {
@@ -137,9 +151,10 @@ var mouseDownBlock = function() {
 							this.destroy();
 						});
 						
-	g_game.graph.input[this.iso.x][this.iso.y] = GraphNodeType.OPEN;
-	g_game.graph.nodes[this.iso.x][this.iso.y].type = GraphNodeType.OPEN;
-	selector.game = { selected: this };
+	g_game.graph.input[block.iso.x][block.iso.y] = GraphNodeType.OPEN;
+	g_game.graph.nodes[block.iso.x][block.iso.y].type = GraphNodeType.OPEN;
+	selector.game = { selected: block };
+
 };
 
 var placeBlock = function(i, j) {
@@ -153,7 +168,7 @@ var placeBlock = function(i, j) {
 		.collision(new Crafty.polygon([0,3*g_game.TW/4],[g_game.TW/2,g_game.TW/2],[g_game.TW,3*g_game.TW/4],[g_game.TW/2,g_game.TW]))
 		//.areaMap([g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW/2,g_game.TW/2],[0,g_game.TW/4])
 		.areaMap([0,g_game.TW/4],[g_game.TW/2,0],[g_game.TW,g_game.TW/4],[g_game.TW,3*g_game.TW/4],[g_game.TW/2,g_game.TW],[0,3*g_game.TW/4])
-		//.bind("MouseOver", mouseOverBlock)
+		.bind("MouseOver", mouseOverBlock)
 		.bind("MouseDown", mouseDownBlock);
 	tile.iso = { x: i, y: j };
 	g_game.ISO.place(tile, i, j, 1);
@@ -191,12 +206,24 @@ var removeDirt = function(block) {
 			}
 		});			
 
+	// remove any walls attached
 	if (g_game.map[block.iso.y][block.iso.x].wallE) {
 		g_game.map[block.iso.y][block.iso.x].wallE.destroy();
 	}
 	if (g_game.map[block.iso.y][block.iso.x].wallW) {
 		g_game.map[block.iso.y][block.iso.x].wallW.destroy();
 	}
+	// make surrounding blocks transparent
+	if (g_game.map[block.iso.y][block.iso.x+1] && g_game.map[block.iso.y][block.iso.x+1].block) {
+		g_game.map[block.iso.y][block.iso.x+1].block.removeComponent('wallDirt').addComponent('wallDirtTrans');
+	}
+	if (g_game.map[block.iso.y+1] && g_game.map[block.iso.y+1][block.iso.x] && g_game.map[block.iso.y+1][block.iso.x].block) {
+		g_game.map[block.iso.y+1][block.iso.x].block.removeComponent('wallDirt').addComponent('wallDirtTrans');
+	}
+	if (g_game.map[block.iso.y+1] && g_game.map[block.iso.y+1][block.iso.x+1] && g_game.map[block.iso.y+1][block.iso.x+1].block) {
+		g_game.map[block.iso.y+1][block.iso.x+1].block.removeComponent('wallDirt').addComponent('wallDirtTrans');
+	}
+	
 	block.destroy();
 	for (var j=-2;j<3;j++) {
 		for (var i=-2;i<3;i++) {
@@ -263,6 +290,19 @@ function doCraftyInitialization() {
 
 			Table: function() {
 				this.requires('2D, ' + g_game.RENDER + ', table');
+			
+				return this;
+			},
+			startItem: function() {
+				
+			}
+			
+		});
+
+		Crafty.c('Chest', {
+
+			Chest: function() {
+				this.requires('2D, ' + g_game.RENDER + ', chest');
 			
 				return this;
 			},
@@ -354,7 +394,7 @@ function doCraftyInitialization() {
 						}
 						//var isoCoords = iso.px2pos(this.x + this.w/2, this.y + this.h);
 						//this.attr({ z: 5 + isoCoords.y * -10 });
-						this.attr({ z: this.y + 128});
+						this.attr({ z: this.y + g_game.TH + this.h});
 					});			
 					
 				this.trigger('NewDirection', this.direction);
@@ -550,9 +590,12 @@ function doCraftyInitialization() {
 							floorGrass: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
 							wallGrass: [g_game.TW, 0, g_game.TW, g_game.TW]
 						});
-						Crafty.sprite(1, "./images/dirtTrans.png", {
+						Crafty.sprite(1, "./images/dirt.png", {
 							floorDirt: [0, g_game.TW/2, g_game.TW, g_game.TW/2],
 							wallDirt: [g_game.TW, 0, g_game.TW, g_game.TW]
+						});
+						Crafty.sprite(1, "./images/dirtTrans.png", {
+							wallDirtTrans: [g_game.TW, 0, g_game.TW, g_game.TW]
 						});
 						Crafty.sprite(32, "./images/kobold.png", {
 							kobold: [0, 0]
@@ -595,6 +638,9 @@ function doCraftyInitialization() {
 						});
 						Crafty.sprite(1, "./images/table.png", {
 							table: [0, 0, 64, 44]
+						});
+						Crafty.sprite(32, "./images/chest.png", {
+							chest: [0, 0]
 						});
 						Crafty.scene("main");
 					}
